@@ -33,6 +33,33 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         $this->getEntityManager()->flush();
     }
 
+    /**
+     * Clear foreign keys pointing at this user so the row can be deleted without losing orders/products.
+     */
+    public function detachUserReferences(User $user): void
+    {
+        $em = $this->getEntityManager();
+
+        $updates = [
+            [\App\Entity\Order::class, 'placedBy'],
+            [\App\Entity\Order::class, 'createdBy'],
+            [\App\Entity\Product::class, 'createdBy'],
+            [\App\Entity\Category::class, 'createdBy'],
+            [\App\Entity\StockMovement::class, 'createdBy'],
+        ];
+
+        foreach ($updates as [$entityClass, $field]) {
+            $em->createQueryBuilder()
+                ->update($entityClass, 'e')
+                ->set('e.' . $field, ':null')
+                ->where('e.' . $field . ' = :user')
+                ->setParameter('null', null)
+                ->setParameter('user', $user)
+                ->getQuery()
+                ->execute();
+        }
+    }
+
 //    /**
 //     * @return User[] Returns an array of User objects
 //     */

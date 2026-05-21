@@ -1,13 +1,6 @@
-api_platform:
-  title: Hello API Platform
-  version: 1.0.0
-  enable_swagger_ui: true
-  defaults:
-    stateless: true
-    cache_headers:
-      vary: ["Content-Type", "Authorization", "Origin"]
 
-  formats:
-    jsonld: ["application/ld+json"]
-    json: ["application/json"]
-    jsonpatch: ["application/merge-patch+json", "application/json"]
+api_platform:
+    title: Hello API Platform
+    version: 1.0.0
+    mapping:
+        paths: ['%kernel.project_dir%/src/Entity']

@@ -3,7 +3,9 @@
 namespace App\Controller\Api;
 
 use App\Entity\User;
+use App\Service\EmailVerificationService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,7 +23,8 @@ class AuthController extends AbstractController
     public function __construct(
         private JWTTokenManagerInterface $jwtManager,
         private EntityManagerInterface $entityManager,
-        private UserPasswordHasherInterface $passwordHasher
+        private UserPasswordHasherInterface $passwordHasher,
+        private EmailVerificationService $emailVerificationService,
     ) {
     }
 
@@ -114,25 +117,67 @@ class AuthController extends AbstractController
             $this->passwordHasher->hashPassword($user, $data['password'])
         );
         $user->setRoles(['ROLE_USER']);
-        $user->setIsVerified(true); // Auto-verify for API registration
-        $user->setVerificationToken(null);
+
+        $verificationToken = EmailVerificationService::generateToken();
+        $user->setVerificationToken($verificationToken);
+        $user->setIsVerified(false);
 
         $this->entityManager->persist($user);
         $this->entityManager->flush();
 
-        // Generate JWT token
-        $token = $this->jwtManager->create($user);
+        try {
+            $this->emailVerificationService->sendVerificationEmail($user, $verificationToken);
+        } catch (TransportExceptionInterface $e) {
+            return new JsonResponse([
+                'error' => 'Account created but verification email could not be sent. Use resend verification or contact support.',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
+        } catch (\Exception $e) {
+            return new JsonResponse([
+                'error' => 'Account created but verification email could not be sent. Please try again later.',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
 
         return new JsonResponse([
-            'message' => 'User registered successfully',
-            'token' => $token,
-            'user' => [
-                'id' => $user->getId(),
-                'email' => $user->getEmail(),
-                'name' => $user->getName(),
-                'roles' => $user->getRoles()
-            ]
+            'message' => 'Account created! Please check your email and verify your account before logging in.',
+            'requiresVerification' => true,
+            'email' => $user->getEmail(),
         ], Response::HTTP_CREATED);
+    }
+
+    #[Route('/resend-verification', name: 'api_resend_verification', methods: ['POST'])]
+    public function resendVerification(Request $request): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data) || empty($data['email'])) {
+            return new JsonResponse([
+                'error' => 'Email is required',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $email = trim((string) $data['email']);
+        $user = $this->entityManager->getRepository(User::class)->findOneBy(['email' => $email]);
+
+        if (!$user || $user->isVerified()) {
+            return new JsonResponse([
+                'message' => 'If an account with this email exists and is unverified, a verification email has been sent.',
+            ]);
+        }
+
+        $newToken = EmailVerificationService::generateToken();
+        $user->setVerificationToken($newToken);
+        $this->entityManager->flush();
+
+        try {
+            $this->emailVerificationService->sendVerificationEmail($user, $newToken);
+        } catch (\Exception $e) {
+            return new JsonResponse([
+                'error' => 'Failed to send verification email. Please try again later.',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        return new JsonResponse([
+            'message' => 'Verification email sent. Please check your inbox.',
+        ]);
     }
 
     #[Route('/google', name: 'api_google', methods: ['POST'])]
@@ -153,19 +198,56 @@ class AuthController extends AbstractController
         $user = $userRepository->findOneBy(['email' => $email]);
 
         if (!$user) {
-            // Create the user if they don't exist
             $user = new User();
             $user->setEmail($email);
             $user->setName($name);
-            // Give a secure random password since they use Google
             $randomPassword = bin2hex(random_bytes(16));
             $user->setPassword($this->passwordHasher->hashPassword($user, $randomPassword));
-            $user->setRoles(['ROLE_USER']);
-            $user->setIsVerified(true);
-            $user->setVerificationToken(null);
+            $user->setRoles([]);
+            $user->setIsVerified(false);
+
+            $verificationToken = EmailVerificationService::generateToken();
+            $user->setVerificationToken($verificationToken);
 
             $this->entityManager->persist($user);
             $this->entityManager->flush();
+
+            try {
+                $this->emailVerificationService->sendVerificationEmail($user, $verificationToken);
+            } catch (TransportExceptionInterface $e) {
+                return new JsonResponse([
+                    'error' => 'Account created but verification email could not be sent. Use resend verification or contact support.',
+                ], Response::HTTP_SERVICE_UNAVAILABLE);
+            } catch (\Exception $e) {
+                return new JsonResponse([
+                    'error' => 'Account created but verification email could not be sent. Please try again later.',
+                ], Response::HTTP_SERVICE_UNAVAILABLE);
+            }
+
+            return new JsonResponse([
+                'message' => 'Account created! Please check your email and verify your account before logging in.',
+                'requiresVerification' => true,
+                'email' => $user->getEmail(),
+            ], Response::HTTP_CREATED);
+        }
+
+        if (!$user->isActive()) {
+            return new JsonResponse([
+                'error' => 'Your account is inactive. Please contact an administrator.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $roles = $user->getRoles();
+        if (in_array('ROLE_ADMIN', $roles, true) || in_array('ROLE_STAFF', $roles, true)) {
+            return new JsonResponse([
+                'error' => 'This email is a staff account and cannot use customer Google sign-in.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        if ($user->isVerified() !== true) {
+            return new JsonResponse([
+                'error' => 'Please verify your email before logging in',
+            ], Response::HTTP_UNAUTHORIZED);
         }
 
         // Generate JWT token

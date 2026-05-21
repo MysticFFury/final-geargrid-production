@@ -42,6 +42,13 @@ final class UserController extends AbstractController
             if ($plainPassword) {
                 $hashedPassword = $passwordHasher->hashPassword($user, $plainPassword);
                 $user->setPassword($hashedPassword);
+            } else {
+                $this->addFlash('error', 'Password is required to create a new user.');
+
+                return $this->render('user/new.html.twig', [
+                    'user' => $user,
+                    'form' => $form,
+                ]);
             }
 
             // Staff/admin accounts do not need email verification (same as web UserChecker).
@@ -132,16 +139,23 @@ final class UserController extends AbstractController
     }
 
     #[Route('/{id}', name: 'app_user_delete', methods: ['POST'])]
-    public function delete(Request $request, User $user, EntityManagerInterface $entityManager): Response
+    public function delete(Request $request, User $user, UserRepository $userRepository, EntityManagerInterface $entityManager): Response
     {
         if ($this->isCsrfTokenValid('delete'.$user->getId(), $request->request->get('_token'))) {
+            $currentUser = $this->getUser();
+            if ($currentUser instanceof User && $currentUser->getId() === $user->getId()) {
+                $this->addFlash('error', 'You cannot delete your own account.');
+
+                return $this->redirectToRoute('app_user_index', [], Response::HTTP_SEE_OTHER);
+            }
+
             $deletedUserEmail = $user->getUserIdentifier();
-            
+
+            $userRepository->detachUserReferences($user);
             $entityManager->remove($user);
             $entityManager->flush();
 
             // Log admin user deletion
-            $currentUser = $this->getUser();
             $log = new Log();
             $log->setAction('DELETE')
                 ->setMessage("Admin '{$currentUser->getUserIdentifier()}' deleted user '{$deletedUserEmail}'")

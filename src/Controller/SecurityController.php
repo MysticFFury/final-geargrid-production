@@ -2,6 +2,8 @@
 
 namespace App\Controller;
 
+use App\Entity\User;
+use App\Security\AccountStatusMessage;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -12,7 +14,14 @@ class SecurityController extends AbstractController
     #[Route(path: '/login', name: 'app_login')]
     public function login(AuthenticationUtils $authenticationUtils): Response
     {
-        if ($this->getUser()) {
+        $user = $this->getUser();
+        if ($user instanceof User) {
+            if (!$user->isActive()) {
+                $this->addFlash('error', AccountStatusMessage::INACTIVE);
+
+                return $this->redirectToRoute('app_logout');
+            }
+
             return $this->redirectToRoute('app_dashboard');
         }
 

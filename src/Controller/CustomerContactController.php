@@ -90,8 +90,15 @@ final class CustomerContactController extends AbstractController
                 try {
                     $mailer->send($email);
                 } catch (TransportExceptionInterface $e) {
-                    $this->addFlash('error', 'Email could not be sent right now. Please try again.');
-                    $this->addFlash('error', 'Mailer error: '.$e->getMessage());
+                    $message = $e->getMessage();
+                    if (str_contains($message, 'unrecognised IP') || str_contains($message, 'authorized_ips')) {
+                        $this->addFlash('error', 'Brevo blocked this server IP. In Brevo go to Settings → Security → Authorized IPs, add your current IP or turn off IP restriction, then try again.');
+                    } else {
+                        $this->addFlash('error', 'Email could not be sent right now. Please try again.');
+                        if ($this->getParameter('kernel.debug')) {
+                            $this->addFlash('error', 'Mailer error: '.$message);
+                        }
+                    }
                     return $this->redirectToRoute('app_customer_contact');
                 }
 

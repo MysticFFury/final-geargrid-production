@@ -32,6 +32,7 @@ security:
       custom_authenticator:
         - App\Security\LoginAuthenticator
         - App\Security\GoogleAuthenticator
+        - App\Security\GoogleCustomerAuthenticator
 
       # 2. We add an entry_point so Symfony knows to redirect unauthenticated
       # users to your standard login page (LoginAuthenticator) by default
@@ -39,7 +40,8 @@ security:
 
       user_checker: App\Security\UserChecker
       logout:
-        path: app_logout 
+        path: app_logout
+        target: app_login
       remember_me:
         secret: "%kernel.secret%"
         lifetime: 604800
@@ -59,6 +61,7 @@ security:
     # API authentication endpoints
     - { path: ^/api/login$, roles: PUBLIC_ACCESS }
     - { path: ^/api/register$, roles: PUBLIC_ACCESS }
+    - { path: ^/api/resend-verification$, roles: PUBLIC_ACCESS }
     - { path: ^/api/google$, roles: PUBLIC_ACCESS }
 
     # Dashboard - Admin & Staff
@@ -79,6 +82,9 @@ security:
 
     # Profile - All authenticated users
     - { path: ^/profile, roles: ROLE_USER }
+
+    # Site root (Symfony server link) → customer landing
+    - { path: ^/$, roles: PUBLIC_ACCESS }
 
     # Customer landing page should be public
     - { path: ^/customer-landing$, roles: PUBLIC_ACCESS }

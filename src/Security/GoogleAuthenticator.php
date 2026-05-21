@@ -13,9 +13,11 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
+use Symfony\Component\Security\Core\Exception\CustomUserMessageAccountStatusException;
 use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
 use Symfony\Component\Security\Http\Authenticator\Passport\Passport;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
+use Symfony\Component\Security\Http\SecurityRequestAttributes;
 
 class GoogleAuthenticator extends OAuth2Authenticator
 {
@@ -28,8 +30,8 @@ class GoogleAuthenticator extends OAuth2Authenticator
 
     public function supports(Request $request): ?bool
     {
-        // This authenticator only triggers on the check route
-        return $request->attributes->get('_route') === 'connect_google_check';
+        return $request->attributes->get('_route') === 'connect_google_check'
+            && $request->getSession()->get(GoogleOAuthFlow::SESSION_KEY) === GoogleOAuthFlow::STAFF;
     }
 
     public function authenticate(Request $request): Passport
@@ -46,40 +48,28 @@ class GoogleAuthenticator extends OAuth2Authenticator
                 // 1. Check if user exists in the GearGrid database
                 $existingUser = $this->entityManager->getRepository(User::class)->findOneBy(['email' => $email]);
 
-                if ($existingUser) {
-                    return $existingUser;
+                if (!$existingUser) {
+                    throw new CustomUserMessageAccountStatusException(AccountStatusMessage::NOT_REGISTERED);
                 }
 
-                // 2. If no user exists, create a new one!
-                $user = new User();
-                $user->setEmail($email);
-                
-                // Extract name from Google account or use email prefix as fallback
-                $name = $googleUser->getName() ?? explode('@', $email)[0];
-                $user->setName($name);
-                
-                // Assign a staff role automatically
-                $user->setRoles(['ROLE_STAFF']);
-                
-                
-                // Google users are automatically verified since they're authenticated via Google
-                $user->setIsVerified(true);
-                $user->setEmail($email);
-                $user->setRoles(['ROLE_STAFF']);
-                
-                // No password needed for OAuth users - it's already null from entity construction
-                // Password is handled by OAuth2, not set here
+                if (!$existingUser->isActive()) {
+                    throw new CustomUserMessageAccountStatusException(AccountStatusMessage::INACTIVE);
+                }
 
-                $this->entityManager->persist($user);
-                $this->entityManager->flush();
+                $roles = $existingUser->getRoles();
+                if (!in_array('ROLE_ADMIN', $roles, true) && !in_array('ROLE_STAFF', $roles, true)) {
+                    throw new CustomUserMessageAccountStatusException(AccountStatusMessage::GOOGLE_STAFF_ONLY);
+                }
 
-                return $user;
+                return $existingUser;
             })
         );
     }
 
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response
     {
+        $request->getSession()->remove(GoogleOAuthFlow::SESSION_KEY);
+
         // Redirect based on user roles
         $user = $token->getUser();
         
@@ -94,7 +84,9 @@ class GoogleAuthenticator extends OAuth2Authenticator
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
     {
-        // Redirect back to login if something goes wrong
+        $request->getSession()->remove(GoogleOAuthFlow::SESSION_KEY);
+        $request->getSession()->set(SecurityRequestAttributes::AUTHENTICATION_ERROR, $exception);
+
         return new RedirectResponse($this->router->generate('app_login'));
     }
 }

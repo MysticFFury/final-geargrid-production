@@ -35,3 +35,9 @@ services:
   App\Service\EmailVerificationService:
     arguments:
       $senderEmail: "%env(MAILER_FROM)%"
+      $appUrl: "%env(DEFAULT_URI)%"
+      $mailerDsn: "%env(MAILER_DSN)%"
+
+  App\Command\TestMailerCommand:
+    arguments:
+      $senderEmail: "%env(MAILER_FROM)%"

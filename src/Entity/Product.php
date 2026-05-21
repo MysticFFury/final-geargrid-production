@@ -76,7 +76,7 @@ class Product
     private ?Category $category = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
-    #[ORM\JoinColumn(nullable: true)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     #[Groups(['product:read'])]
     private ?User $createdBy = null;
 

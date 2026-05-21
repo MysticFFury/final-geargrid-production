@@ -150,6 +150,17 @@
                         <p class="auth-subtitle">Create your account in seconds.</p>
                     </div>
 
+                    {% if error %}
+                        <div class="alert" style="background: rgba(220, 53, 69, 0.15); border: 1px solid rgba(220, 53, 69, 0.3); color: #fca5a5; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; font-size: 0.9rem;">
+                            {% set errorText = error.message|default('') %}
+                            {% if errorText is not empty %}
+                                {{ errorText }}
+                            {% else %}
+                                {{ error.messageKey|trans(error.messageData, 'security') }}
+                            {% endif %}
+                        </div>
+                    {% endif %}
+
                     {{ form_start(registrationForm) }}
                         
                         <div class="input-group">
@@ -184,15 +195,15 @@
                         <button class="auth-btn" type="submit">Create Account <i class="fas fa-arrow-right" style="margin-left: 5px;"></i></button>
                     {{ form_end(registrationForm) }}
 
-                    <!-- OAuth2 Sign-In Options -->
                     <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid rgba(255, 255, 255, 0.1);">
                         <p style="text-align: center; color: #94a3b8; font-size: 0.9rem; margin-bottom: 1.5rem;">Or sign up with</p>
-                        <a href="{{ path('connect_google') }}" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 1.1rem; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px; color: #fff; text-decoration: none; transition: all 0.3s ease; font-weight: 600; background: rgba(255, 255, 255, 0.02);">
+                        <a href="{{ path('connect_google_register') }}" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 1.1rem; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px; color: #fff; text-decoration: none; transition: all 0.3s ease; font-weight: 600; background: rgba(255, 255, 255, 0.02);">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M21.3055 10.0415H20.5039V10H12V14H18.4927C17.9921 15.9297 16.3633 17.3438 14.3438 17.3438C11.9258 17.3438 9.96484 15.3828 9.96484 13C9.96484 10.6172 11.9258 8.65625 14.3438 8.65625C15.4766 8.65625 16.5117 9.02344 17.3242 9.62891L20.2266 6.72656C18.3945 5.09375 15.9766 4.3125 13.5 4.3125C8.33008 4.3125 4.16016 8.48242 4.16016 13.6523C4.16016 18.8223 8.33008 22.9922 13.5 22.9922C18.6699 22.9922 22.8398 18.8223 22.8398 13.6523C22.8398 13.0039 22.7773 12.3691 22.6621 11.7578H21.3055V10.0415Z" fill="white"/>
                             </svg>
                             Google
                         </a>
+
                     </div>
 
                     <div class="auth-footer">

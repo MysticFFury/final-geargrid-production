@@ -17,7 +17,7 @@ class EmailVerificationController extends AbstractController
         $user = $entityManager->getRepository(User::class)->findOneBy(['verificationToken' => $token]);
 
         if (!$user) {
-            $this->addFlash('error', 'Invalid or expired verification link.');
+            $this->addFlash('error', 'Invalid or expired verification link. Please use the "Resend it" link at the bottom of the page to get a new one.');
             return $this->redirectToRoute('app_login');
         }
 

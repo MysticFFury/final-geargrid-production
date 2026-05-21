@@ -42,16 +42,11 @@ class ResendVerificationController extends AbstractController
                 return $this->redirectToRoute('app_login');
             }
 
-            // Generate a new verification token
-            $newToken = EmailVerificationService::generateToken();
-            $user->setVerificationToken($newToken);
-            $entityManager->flush();
-
-            try {
-                $this->emailVerificationService->sendVerificationEmail($user, $newToken);
-                $this->addFlash('success', 'Verification email sent! Please check your inbox.');
-            } catch (\Exception $e) {
-                $this->addFlash('error', 'Failed to send verification email. Please try again later.');
+            $result = $this->emailVerificationService->sendFreshVerificationEmail($user, $entityManager);
+            if ($result->sent) {
+                $this->addFlash('success', 'Verification email sent! Please check your inbox and spam folder.');
+            } else {
+                $this->addFlash('error', $result->userMessage ?? 'Failed to send verification email. Please try again later.');
             }
 
             return $this->redirectToRoute('app_login');
