@@ -1,4 +1,4 @@
-﻿###> symfony/framework-bundle ###
+###> symfony/framework-bundle ###
 /.env.local
 /.env.local.php
 /.env.*.local
@@ -23,7 +23,6 @@
 ###< lexik/jwt-authentication-bundle ###
 
 # Local overrides with secrets (database URL, APP_SECRET, etc.)
-/.env
 
 # Uploaded product images (runtime data)
 /public/uploads/
