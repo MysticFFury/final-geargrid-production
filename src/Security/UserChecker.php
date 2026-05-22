@@ -34,11 +34,7 @@ class UserChecker implements UserCheckerInterface
             return;
         }
 
-        if (!$this->isUnverifiedCustomer($user)) {
-            return;
-        }
-
-        $this->denyUnverifiedCustomer($user);
+        // Verification check removed globally.
     }
 
     private function isUnverifiedCustomer(User $user): bool

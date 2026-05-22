@@ -60,7 +60,7 @@ final class AdminApiController extends AbstractController
             'totalProducts' => $products->count([]),
             'totalCategories' => $categories->count([]),
             'totalOrders' => $orders->count([]),
-            'totalUsers' => $isAdmin ? $users->count([]) : null,
+            'totalUsers' => $users->count([]),
             'recentSales' => $recentSales,
             'recentOrders' => array_map(fn (Order $o) => $this->serializeOrder($o), $recentOrders),
             'recentProducts' => array_map(
