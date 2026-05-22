@@ -79,15 +79,9 @@ class GoogleCustomerAuthenticator extends OAuth2Authenticator
                     $isStaffOrAdmin = in_array('ROLE_STAFF', $roles) || in_array('ROLE_ADMIN', $roles);
 
                     if (!$isStaffOrAdmin && $existingUser->isVerified() !== true) {
-                        $result = $this->emailVerificationService->sendFreshVerificationEmail(
-                            $existingUser,
-                            $this->entityManager
-                        );
-                        throw new CustomUserMessageAccountStatusException(
-                            $result->sent
-                                ? AccountStatusMessage::verifyEmailRequired($email)
-                                : ($result->userMessage ?? AccountStatusMessage::VERIFY_EMAIL_SEND_FAILED)
-                        );
+                        // Auto-verify legacy unverified accounts when they log in with Google
+                        $existingUser->setIsVerified(true);
+                        $this->entityManager->flush();
                     }
 
                     return $existingUser;
@@ -101,10 +95,7 @@ class GoogleCustomerAuthenticator extends OAuth2Authenticator
                 $user->setEmail($email);
                 $user->setName($googleUser->getName() ?? explode('@', $email)[0]);
                 $user->setRoles([]);
-                $user->setIsVerified(false);
-
-                $verificationToken = EmailVerificationService::generateToken();
-                $user->setVerificationToken($verificationToken);
+                $user->setIsVerified(true);
 
                 $randomPassword = bin2hex(random_bytes(16));
                 $user->setPassword($this->passwordHasher->hashPassword($user, $randomPassword));
@@ -112,21 +103,7 @@ class GoogleCustomerAuthenticator extends OAuth2Authenticator
                 $this->entityManager->persist($user);
                 $this->entityManager->flush();
 
-                $session = $request->getSession();
-                $session->set(self::SESSION_SIGNUP_PENDING, true);
-                $session->set(self::SESSION_SIGNUP_EMAIL, $email);
-
-                try {
-                    $this->emailVerificationService->sendVerificationEmail($user, $verificationToken);
-                } catch (TransportExceptionInterface $e) {
-                    $session->set(self::SESSION_SIGNUP_PENDING . '_email_failed', true);
-                    $session->set(self::SESSION_SIGNUP_PENDING . '_email_error', MailerErrorMessage::fromThrowable($e));
-                } catch (\Exception $e) {
-                    $session->set(self::SESSION_SIGNUP_PENDING . '_email_failed', true);
-                    $session->set(self::SESSION_SIGNUP_PENDING . '_email_error', MailerErrorMessage::fromThrowable($e));
-                }
-
-                throw new CustomUserMessageAccountStatusException(AccountStatusMessage::REGISTRATION_VERIFY_EMAIL);
+                return $user;
             })
         );
     }

@@ -57,10 +57,8 @@ class RegistrationController extends AbstractController
                 // Public user registration - set as regular user (ROLE_USER is automatically added by User entity)
                 $user->setRoles([]);
                 
-                // Generate verification token for public users
-                $verificationToken = EmailVerificationService::generateToken();
-                $user->setVerificationToken($verificationToken);
-                $user->setIsVerified(false);
+                // No verification required - auto-verify public users
+                $user->setIsVerified(true);
             } elseif (empty($user->getRoles()) || (count($user->getRoles()) === 1 && in_array('ROLE_USER', $user->getRoles()))) {
                 // Admin created user without selecting roles - default to STAFF
                 $user->setRoles(['ROLE_STAFF']);
@@ -88,29 +86,8 @@ class RegistrationController extends AbstractController
                 // Redirect admin to user list page
                 return $this->redirectToRoute('app_user_index');
             } else {
-                // Public registration: send verification link to the email they signed up with (Gmail, etc.)
-                try {
-                    $this->emailVerificationService->sendVerificationEmail($user, $verificationToken);
-                    $this->addFlash(
-                        'success',
-                        sprintf(
-                            'Account created! We sent a verification link to %s. Open that email and click the link before signing in.',
-                            $user->getEmail()
-                        )
-                    );
-                } catch (TransportExceptionInterface $e) {
-                    $this->addFlash('warning', sprintf(
-                        'Account created, but the verification email could not be sent to %s. %s',
-                        $user->getEmail(),
-                        MailerErrorMessage::fromThrowable($e)
-                    ));
-                } catch (\Exception $e) {
-                    $this->addFlash('warning', sprintf(
-                        'Account created, but we could not send the verification email. %s',
-                        MailerErrorMessage::fromThrowable($e)
-                    ));
-                }
-
+                // Public registration: Auto-verified, login now.
+                $this->addFlash('success', 'Account created successfully! You can now sign in.');
                 return $this->redirectToRoute('app_login');
             }
         }
