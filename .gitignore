@@ -25,4 +25,4 @@
 # Local overrides with secrets (database URL, APP_SECRET, etc.)
 
 # Uploaded product images (runtime data)
-/public/uploads/
+# /public/uploads/

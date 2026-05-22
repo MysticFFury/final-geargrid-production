@@ -15,18 +15,13 @@ use EasyCorp\Bundle\EasyAdminBundle\Config\MenuItem;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractDashboardController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminDashboard;
 
+#[AdminDashboard(routePath: '/admin', routeName: 'admin')]
 class DashboardController extends AbstractDashboardController
 {
-    public function __construct(
-        private ProductRepository $productRepository,
-        private CategoryRepository $categoryRepository,
-        private OrderRepository $orderRepository,
-        private EntityManagerInterface $entityManager
-    ) {
-    }
 
-    #[Route('/admin', name: 'admin')]
+
     public function index(): Response
     {
         // Redirect to unified dashboard (admin will see full data)
@@ -34,16 +29,20 @@ class DashboardController extends AbstractDashboardController
     }
 
     #[Route('/dashboard', name: 'app_dashboard')]
-    public function dashboard(): Response
+    public function dashboard(
+        ProductRepository $productRepository,
+        CategoryRepository $categoryRepository,
+        OrderRepository $orderRepository
+    ): Response
     {
         // Get dashboard statistics
-        $totalProducts = count($this->productRepository->findAll());
-        $totalCategories = count($this->categoryRepository->findAll());
-        $totalOrders = count($this->orderRepository->findAll());
+        $totalProducts = count($productRepository->findAll());
+        $totalCategories = count($categoryRepository->findAll());
+        $totalOrders = count($orderRepository->findAll());
         
                 
         // Get recent products
-        $recentProducts = $this->productRepository->createQueryBuilder('p')
+        $recentProducts = $productRepository->createQueryBuilder('p')
             ->orderBy('p.createdAt', 'DESC')
             ->setMaxResults(5)
             ->getQuery()
