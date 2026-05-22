@@ -58,10 +58,10 @@ class AuthController extends AbstractController
             !in_array('ROLE_ADMIN', $roles, true)
             && !in_array('ROLE_STAFF', $roles, true);
 
+        // Auto-verify if they try to log in and were legacy unverified
         if ($isCustomerOnly && $user->isVerified() !== true) {
-            return new JsonResponse([
-                'error' => 'Please verify your email before logging in'
-            ], Response::HTTP_UNAUTHORIZED);
+            $user->setIsVerified(true);
+            $this->entityManager->flush();
         }
 
         // Verify password
@@ -118,29 +118,23 @@ class AuthController extends AbstractController
         );
         $user->setRoles(['ROLE_USER']);
 
-        $verificationToken = EmailVerificationService::generateToken();
-        $user->setVerificationToken($verificationToken);
-        $user->setIsVerified(false);
+        $user->setIsVerified(true);
 
         $this->entityManager->persist($user);
         $this->entityManager->flush();
 
-        try {
-            $this->emailVerificationService->sendVerificationEmail($user, $verificationToken);
-        } catch (TransportExceptionInterface $e) {
-            return new JsonResponse([
-                'error' => 'Account created but verification email could not be sent. Use resend verification or contact support.',
-            ], Response::HTTP_SERVICE_UNAVAILABLE);
-        } catch (\Exception $e) {
-            return new JsonResponse([
-                'error' => 'Account created but verification email could not be sent. Please try again later.',
-            ], Response::HTTP_SERVICE_UNAVAILABLE);
-        }
+        // Generate JWT token immediately
+        $token = $this->jwtManager->create($user);
 
         return new JsonResponse([
-            'message' => 'Account created! Please check your email and verify your account before logging in.',
-            'requiresVerification' => true,
-            'email' => $user->getEmail(),
+            'message' => 'Account created successfully',
+            'token' => $token,
+            'user' => [
+                'id' => $user->getId(),
+                'email' => $user->getEmail(),
+                'name' => $user->getName(),
+                'roles' => $user->getRoles()
+            ]
         ], Response::HTTP_CREATED);
     }
 
@@ -204,30 +198,23 @@ class AuthController extends AbstractController
             $randomPassword = bin2hex(random_bytes(16));
             $user->setPassword($this->passwordHasher->hashPassword($user, $randomPassword));
             $user->setRoles([]);
-            $user->setIsVerified(false);
-
-            $verificationToken = EmailVerificationService::generateToken();
-            $user->setVerificationToken($verificationToken);
+            $user->setIsVerified(true);
 
             $this->entityManager->persist($user);
             $this->entityManager->flush();
 
-            try {
-                $this->emailVerificationService->sendVerificationEmail($user, $verificationToken);
-            } catch (TransportExceptionInterface $e) {
-                return new JsonResponse([
-                    'error' => 'Account created but verification email could not be sent. Use resend verification or contact support.',
-                ], Response::HTTP_SERVICE_UNAVAILABLE);
-            } catch (\Exception $e) {
-                return new JsonResponse([
-                    'error' => 'Account created but verification email could not be sent. Please try again later.',
-                ], Response::HTTP_SERVICE_UNAVAILABLE);
-            }
+            // Generate JWT token
+            $token = $this->jwtManager->create($user);
 
             return new JsonResponse([
-                'message' => 'Account created! Please check your email and verify your account before logging in.',
-                'requiresVerification' => true,
-                'email' => $user->getEmail(),
+                'message' => 'Google account created and authenticated',
+                'token' => $token,
+                'user' => [
+                    'id' => $user->getId(),
+                    'email' => $user->getEmail(),
+                    'name' => $user->getName(),
+                    'roles' => $user->getRoles()
+                ]
             ], Response::HTTP_CREATED);
         }
 
@@ -244,10 +231,10 @@ class AuthController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
+        // Auto-verify if they were legacy unverified
         if ($user->isVerified() !== true) {
-            return new JsonResponse([
-                'error' => 'Please verify your email before logging in',
-            ], Response::HTTP_UNAUTHORIZED);
+            $user->setIsVerified(true);
+            $this->entityManager->flush();
         }
 
         // Generate JWT token
