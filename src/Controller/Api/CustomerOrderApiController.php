@@ -89,6 +89,29 @@ final class CustomerOrderApiController extends AbstractController
         $this->em->persist($order);
         $this->em->flush();
 
+        // Broadcast to WebSocket server
+        try {
+            $wsUrl = $_ENV['WEBSOCKET_SERVER_URL'] ?? 'http://127.0.0.1:8085/broadcast';
+            $ch = curl_init($wsUrl);
+            $payload = json_encode([
+                'event' => 'new-order',
+                'data' => [
+                    'orderId' => $order->getId(),
+                    'customerName' => $order->getCustomerName(),
+                    'totalPrice' => $order->getTotalPrice(),
+                    'message' => "New order #{$order->getId()} placed by {$order->getCustomerName()}!"
+                ]
+            ]);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type:application/json']);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+            curl_exec($ch);
+            curl_close($ch);
+        } catch (\Exception $e) {
+            // Silence socket/network errors
+        }
+
         return $this->json($this->serializeOrder($order, true), Response::HTTP_CREATED);
     }
 

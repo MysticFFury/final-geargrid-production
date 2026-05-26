@@ -224,6 +224,29 @@ final class AdminApiController extends AbstractController
         $this->em->flush();
         $this->logService->log('UPDATE', 'Order', "Updated order #{$order->getId()} status from {$oldStatus} to {$newStatus}");
 
+        // Broadcast to WebSocket server
+        try {
+            $wsUrl = $_ENV['WEBSOCKET_SERVER_URL'] ?? 'http://127.0.0.1:8085/broadcast';
+            $ch = curl_init($wsUrl);
+            $payload = json_encode([
+                'event' => 'order-status-updated',
+                'data' => [
+                    'orderId' => $order->getId(),
+                    'customerId' => $order->getPlacedBy()?->getId(),
+                    'status' => $newStatus,
+                    'message' => "Order #{$order->getId()} status updated to {$newStatus}!"
+                ]
+            ]);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type:application/json']);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+            curl_exec($ch);
+            curl_close($ch);
+        } catch (\Exception $e) {
+            // Silence socket/network errors
+        }
+
         return $this->json($this->serializeOrder($order, true));
     }
 
