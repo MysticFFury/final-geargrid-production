@@ -19,7 +19,7 @@
             <a class="landing-nav-link {{ app.request.attributes.get('_route') == 'app_customer_contact' ? 'active' : '' }}" href="{{ path('app_customer_contact') }}"><i class="fas fa-envelope"></i> Contact</a>
         </nav>
 
-        <div class="landing-customer-actions" style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; justify-content: flex-end;">
+        <div class="landing-customer-actions" style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: nowrap; justify-content: flex-end;">
             {% if app.user and not is_granted('ROLE_ADMIN') and not is_granted('ROLE_STAFF') %}
                 <a class="landing-nav-link {{ app.request.attributes.get('_route') == 'app_customer_cart' ? 'active' : '' }}" href="{{ path('app_customer_cart') }}" title="Cart"><i class="fas fa-basket-shopping"></i> Cart</a>
                 <a class="landing-nav-link {{ account_section and app.request.attributes.get('_route') != 'app_customer_cart' ? 'active' : '' }}" href="{{ path('app_profile') }}" title="My account"><i class="fas fa-user-circle"></i> Account</a>
