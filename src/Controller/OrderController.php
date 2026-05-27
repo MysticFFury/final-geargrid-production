@@ -105,6 +105,29 @@ final class OrderController extends AbstractController
 
             // LOG THE ACTION
             $logService->log('UPDATE', 'Order', "Updated order #{$order->getId()}");
+            
+            // Broadcast to WebSocket server so mobile apps update in real-time
+            try {
+                $wsUrl = $_ENV['WEBSOCKET_SERVER_URL'] ?? 'http://127.0.0.1:8085/broadcast';
+                $ch = curl_init($wsUrl);
+                $payload = json_encode([
+                    'event' => 'order-status-updated',
+                    'data' => [
+                        'orderId' => $order->getId(),
+                        'customerId' => $order->getPlacedBy()?->getId(),
+                        'status' => $order->getStatus(),
+                        'message' => "Order #{$order->getId()} has been updated."
+                    ]
+                ]);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type:application/json']);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+                curl_exec($ch);
+                curl_close($ch);
+            } catch (\Exception $e) {
+                // Silence network errors
+            }
 
             $this->addFlash('success', 'Order #' . $order->getId() . ' has been updated successfully!');
             return $this->redirectToRoute('app_order_index', [], Response::HTTP_SEE_OTHER);
@@ -143,6 +166,30 @@ final class OrderController extends AbstractController
         $entityManager->flush();
 
         $logService->log('UPDATE', 'Order', "Updated order #{$order->getId()} status from {$oldStatus} to {$newStatus}");
+        
+        // Broadcast to WebSocket server so mobile apps update in real-time
+        try {
+            $wsUrl = $_ENV['WEBSOCKET_SERVER_URL'] ?? 'http://127.0.0.1:8085/broadcast';
+            $ch = curl_init($wsUrl);
+            $payload = json_encode([
+                'event' => 'order-status-updated',
+                'data' => [
+                    'orderId' => $order->getId(),
+                    'customerId' => $order->getPlacedBy()?->getId(),
+                    'status' => $newStatus,
+                    'message' => "Order #{$order->getId()} status updated to {$newStatus}!"
+                ]
+            ]);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type:application/json']);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+            curl_exec($ch);
+            curl_close($ch);
+        } catch (\Exception $e) {
+            // Silence network errors
+        }
+
         $this->addFlash('success', "Order #{$order->getId()} status updated to {$newStatus}.");
 
         return $this->redirect($request->headers->get('referer') ?: $this->generateUrl('app_order_show', ['id' => $order->getId()]));
