@@ -105,6 +105,27 @@ final class CustomerCheckoutController extends AbstractController
             $em->persist($order);
             $em->flush();
             $em->commit();
+
+            // Broadcast to WebSocket server so mobile apps update instantly
+            try {
+                $wsUrl = $_ENV['WEBSOCKET_SERVER_URL'] ?? 'http://127.0.0.1:8085/broadcast';
+                $ch = curl_init($wsUrl);
+                $payload = json_encode([
+                    'event' => 'new-order',
+                    'data' => [
+                        'orderId' => $order->getId(),
+                        'message' => "Order #{$order->getId()} was just placed."
+                    ]
+                ]);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type:application/json']);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+                curl_exec($ch);
+                curl_close($ch);
+            } catch (\Exception $e) {
+                // Ignore socket errors
+            }
         } catch (\Throwable $e) {
             $em->rollback();
             throw $e;
