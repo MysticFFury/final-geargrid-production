@@ -61,6 +61,7 @@ class Order
      * @var Collection<int, Product>
      */
     #[ORM\ManyToMany(targetEntity: Product::class, inversedBy: 'orders')]
+    #[ORM\JoinTable(name: 'order_product')]
     private Collection $products;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
