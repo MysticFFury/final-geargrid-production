@@ -101,7 +101,7 @@
                             <div class="order-meta">{{ order.createdAt ? order.createdAt|date('M j, Y g:i a') : '' }}</div>
                         </div>
                         {% set st = order.status|default('')|lower %}
-                        <span class="status-pill status-{{ st == 'pending' ? 'pending' : (st == 'processing' ? 'processing' : (st == 'cancelled' ? 'cancelled' : 'shipped')) }}">{{ order.status }}</span>
+                        <span id="customer-status-{{ order.id }}" class="status-pill status-{{ st == 'pending' ? 'pending' : (st == 'processing' ? 'processing' : (st == 'cancelled' ? 'cancelled' : 'shipped')) }}">{{ order.status }}</span>
                     </div>
 
                     {% if order.items|length > 0 %}
@@ -156,4 +156,45 @@ if (window.history && window.history.replaceState) {
 }
 </script>
 {% endif %}
+
+<script>
+    // Websocket Client for Real-time Updates (Node.js Server)
+    const wsUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+        ? 'ws://127.0.0.1:8085' 
+        : 'wss://geargrid-websocket-server-production.up.railway.app'; // Fallback to Railway node server if used
+        
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = function() {
+        console.log('[WebSocket] Customer Panel Connected to Node.js Hub');
+    };
+
+    ws.onmessage = function(event) {
+        try {
+            const payload = JSON.parse(event.data);
+            
+            if (payload.event === 'order-status-updated') {
+                const orderId = payload.data.orderId;
+                const newStatus = payload.data.status;
+                
+                const badge = document.getElementById('customer-status-' + orderId);
+                
+                if (badge) {
+                    badge.innerText = newStatus;
+                    const st = newStatus.toLowerCase();
+                    badge.className = 'status-pill status-' + (st === 'pending' ? 'pending' : (st === 'processing' ? 'processing' : (st === 'cancelled' ? 'cancelled' : 'shipped')));
+                    
+                    // Add a little pop animation
+                    badge.style.transform = 'scale(1.2)';
+                    badge.style.transition = 'transform 0.3s ease';
+                    setTimeout(() => {
+                        badge.style.transform = 'scale(1)';
+                    }, 300);
+                }
+            }
+        } catch (e) {
+            console.error('[WebSocket] Error parsing message', e);
+        }
+    };
+</script>
 {% endblock %}

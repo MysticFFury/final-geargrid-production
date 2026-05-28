@@ -277,6 +277,7 @@
 {% block javascripts %}
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 $(document).ready(function() {
     const table = $('#orderTable').DataTable({
@@ -308,5 +309,39 @@ $(document).ready(function() {
         });
     }, 5000);
 });
+
+// Websocket Client for Real-time Updates (Node.js Server)
+const wsUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'ws://127.0.0.1:8085' 
+    : 'wss://geargrid-websocket-server-production.up.railway.app'; // Fallback to Railway node server if used
+
+const ws = new WebSocket(wsUrl);
+
+ws.onopen = function() {
+    console.log('[WebSocket] Admin Panel Connected to Node.js Hub');
+};
+
+ws.onmessage = function(event) {
+    try {
+        const payload = JSON.parse(event.data);
+        if (payload.event === 'new-order') {
+            Swal.fire({
+                title: 'New Order Received! 🎉',
+                text: payload.data.message || 'A customer just placed a new order.',
+                icon: 'success',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 4000,
+                timerProgressBar: true
+            });
+            setTimeout(() => {
+                window.location.reload();
+            }, 2500);
+        }
+    } catch (e) {
+        console.error('[WebSocket] Error parsing message', e);
+    }
+};
 </script>
 {% endblock %}
