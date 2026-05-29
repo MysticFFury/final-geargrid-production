@@ -636,6 +636,7 @@
 {% block javascripts %}
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 $(document).ready(function() {
     const table = $('#userTable').DataTable({
@@ -654,6 +655,7 @@ $(document).ready(function() {
             infoFiltered: "(filtered from _MAX_ total users)"
         }
     });
+    window.userTable = table;
 
     // Wire up the custom search input to the DataTables filter
     $('#userSearch').on('keyup', function () {
@@ -667,5 +669,96 @@ $(document).ready(function() {
         });
     }, 5000);
 });
+
+// WebSocket Client for Real-time Updates
+const wsUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'ws://127.0.0.1:8085' 
+    : 'wss://geargrid-websocket-server-production.up.railway.app';
+
+const ws = new WebSocket(wsUrl);
+
+ws.onopen = function() {
+    console.log('[WebSocket] Users Panel Connected to Node.js Hub');
+};
+
+ws.onmessage = function(event) {
+    try {
+        const payload = JSON.parse(event.data);
+        if (payload.event === 'new-user') {
+            const userData = payload.data || {};
+            
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: 'New User Registered! 👤',
+                    text: userData.message || 'A new user just created an account.',
+                    icon: 'success',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 4000,
+                    timerProgressBar: true
+                });
+            }
+            
+            if (window.userTable) {
+                const userId = userData.userId || 'NEW';
+                const name = userData.name || 'Unknown User';
+                const email = userData.email || 'N/A';
+                const roles = userData.roles || ['ROLE_USER'];
+                const isActive = userData.isActive;
+                const date = new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+                
+                let rolesHtml = '';
+                roles.forEach(role => {
+                    if (role !== 'ROLE_USER') {
+                        rolesHtml += `<span class="badge badge-role">${role.replace('ROLE_', '')}</span> `;
+                    }
+                });
+                
+                const toggleUrl = '/user/' + userId + '/toggle';
+                const statusHtml = `
+                    <form method="post" action="${toggleUrl}" style="display:inline;">
+                        <button type="button" onclick="window.location.reload()" title="Refresh to toggle" class="px-3 py-1 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'}">
+                            ${isActive ? 'Active' : 'Inactive'}
+                        </button>
+                    </form>
+                `;
+                
+                const showUrl = '/user/' + userId;
+                const editUrl = '/user/' + userId + '/edit';
+                
+                const actionsHtml = `
+                    <div class="flex items-center gap-0">
+                        <a href="${showUrl}" class="bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 border border-purple-600/30 px-3 py-1.5 text-sm font-medium transition-colors flex items-center gap-1 rounded-l-lg">
+                            <i class="fas fa-eye"></i> View
+                        </a>
+                        <a href="${editUrl}" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 text-sm font-medium transition-colors flex items-center gap-1 border-l border-l-gray-700">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                    </div>
+                `;
+
+                const newRowNode = window.userTable.row.add([
+                    '<span class="badge badge-id">#' + userId + '</span>',
+                    '<span class="font-semibold">' + name + '</span>',
+                    '<span class="text-gray-400">' + email + '</span>',
+                    rolesHtml,
+                    '<span class="text-gray-400">' + date + '</span>',
+                    statusHtml,
+                    actionsHtml
+                ]).draw(false).node();
+                
+                if (newRowNode) {
+                    $(newRowNode).css('background', 'rgba(139, 92, 246, 0.1)').css('transition', 'all 0.5s ease');
+                    setTimeout(() => {
+                        $(newRowNode).css('background', '');
+                    }, 2000);
+                }
+            }
+        }
+    } catch (e) {
+        console.error('[WebSocket] Error parsing message', e);
+    }
+};
 </script>
 {% endblock %}

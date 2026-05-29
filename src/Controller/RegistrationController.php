@@ -69,6 +69,31 @@ class RegistrationController extends AbstractController
             $entityManager->persist($user);
             $entityManager->flush();
 
+            // Broadcast to WebSocket server
+            try {
+                $wsUrl = $_ENV['WEBSOCKET_SERVER_URL'] ?? 'http://127.0.0.1:8085/broadcast';
+                $ch = curl_init($wsUrl);
+                $payload = json_encode([
+                    'event' => 'new-user',
+                    'data' => [
+                        'userId' => $user->getId(),
+                        'name' => $user->getName() ?: 'Unknown User',
+                        'email' => $user->getEmail(),
+                        'roles' => $user->getRoles(),
+                        'isActive' => $user->isActive(),
+                        'message' => "New user {$user->getEmail()} registered!"
+                    ]
+                ]);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type:application/json']);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+                curl_exec($ch);
+                curl_close($ch);
+            } catch (\Exception $e) {
+                // Silence network errors
+            }
+
             // Log user creation if admin is creating it
             if ($isAdmin) {
                 $log = new Log();
