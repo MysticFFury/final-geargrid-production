@@ -114,7 +114,9 @@ final class CustomerCheckoutController extends AbstractController
                     'event' => 'new-order',
                     'data' => [
                         'orderId' => $order->getId(),
-                        'message' => "Order #{$order->getId()} was just placed."
+                        'customerName' => $order->getCustomerName(),
+                        'totalPrice' => $order->getTotalPrice(),
+                        'message' => "New order #{$order->getId()} placed by {$order->getCustomerName()}!"
                     ]
                 ]);
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
