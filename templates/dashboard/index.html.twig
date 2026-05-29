@@ -325,7 +325,7 @@
                     <div class="flex justify-between items-start mb-4">
                         <div>
                             <p class="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-1">{{ isAdmin ? 'Users' : 'Revenue' }}</p>
-                            <p class="text-4xl text-white font-bold tracking-tight">{% if isAdmin %}{{ totalUsers ?? 0 }}{% else %}₱{{ recentSales|default(0)|number_format(0, '.', ',') }}{% endif %}</p>
+                            <p class="text-4xl text-white font-bold tracking-tight" id="{{ isAdmin ? 'totalUsersCount' : 'totalRevenueCount' }}">{% if isAdmin %}{{ totalUsers ?? 0 }}{% else %}₱{{ recentSales|default(0)|number_format(0, '.', ',') }}{% endif %}</p>
                         </div>
                         <div class="icon-wrapper">
                             <i class="fas {{ isAdmin ? 'fa-users' : 'fa-wallet' }}"></i>
@@ -694,6 +694,12 @@ ws.onmessage = function(event) {
                 if (tbody.children.length > 5) {
                     tbody.removeChild(tbody.lastChild);
                 }
+            }
+        } else if (payload.event === 'new-user') {
+            const usersCountEl = document.getElementById('totalUsersCount');
+            if (usersCountEl) {
+                let currentTotal = parseInt(usersCountEl.innerText.replace(/,/g, '')) || 0;
+                usersCountEl.innerText = (currentTotal + 1).toLocaleString();
             }
         }
     } catch (e) {
