@@ -58,6 +58,27 @@ final class ProductController extends AbstractController
             // LOG THE ACTION
             $logService->log('CREATE', 'Product', "Created new product: {$product->getName()}");
 
+            // Broadcast to WebSocket server
+            try {
+                $wsUrl = $_ENV['WEBSOCKET_SERVER_URL'] ?? 'http://127.0.0.1:8085/broadcast';
+                $ch = curl_init($wsUrl);
+                $payload = json_encode([
+                    'event' => 'product-updated',
+                    'data' => [
+                        'productId' => $product->getId(),
+                        'name' => $product->getName(),
+                        'action' => 'create',
+                        'message' => "New product {$product->getName()} added!"
+                    ]
+                ]);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type:application/json']);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+                curl_exec($ch);
+                curl_close($ch);
+            } catch (\Exception $e) { }
+
             $this->addFlash('success', '✅ Product added successfully!');
             return $this->redirectToRoute('app_product_index');
         }
@@ -109,6 +130,27 @@ final class ProductController extends AbstractController
             // LOG THE ACTION
             $logService->log('UPDATE', 'Product', "Updated product: {$product->getName()}");
 
+            // Broadcast to WebSocket server
+            try {
+                $wsUrl = $_ENV['WEBSOCKET_SERVER_URL'] ?? 'http://127.0.0.1:8085/broadcast';
+                $ch = curl_init($wsUrl);
+                $payload = json_encode([
+                    'event' => 'product-updated',
+                    'data' => [
+                        'productId' => $product->getId(),
+                        'name' => $product->getName(),
+                        'action' => 'update',
+                        'message' => "Product {$product->getName()} has been updated!"
+                    ]
+                ]);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type:application/json']);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+                curl_exec($ch);
+                curl_close($ch);
+            } catch (\Exception $e) { }
+
             $this->addFlash('success', '✅ Product updated successfully!');
             return $this->redirectToRoute('app_product_index');
         }
@@ -135,6 +177,28 @@ final class ProductController extends AbstractController
                 }
 
                 $logService->log('DELETE', 'Product', "Deleted product: {$productName}");
+                
+                // Broadcast to WebSocket server
+                try {
+                    $wsUrl = $_ENV['WEBSOCKET_SERVER_URL'] ?? 'http://127.0.0.1:8085/broadcast';
+                    $ch = curl_init($wsUrl);
+                    $payload = json_encode([
+                        'event' => 'product-updated',
+                        'data' => [
+                            'productId' => $product->getId(),
+                            'name' => $productName,
+                            'action' => 'delete',
+                            'message' => "Product {$productName} has been removed."
+                        ]
+                    ]);
+                    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type:application/json']);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+                    curl_exec($ch);
+                    curl_close($ch);
+                } catch (\Exception $e) { }
+                
                 $this->addFlash('success', '🗑️ Product deleted successfully!');
             } catch (ForeignKeyConstraintViolationException) {
                 $this->addFlash('error', 'This product cannot be deleted because it is already used in existing orders.');

@@ -143,6 +143,28 @@ final class StockController extends AbstractController
 
         $this->addFlash('success', "Added {$amount} to {$product->getName()}. New quantity: {$product->getQuantity()}.");
 
+        // Broadcast to WebSocket server
+        try {
+            $wsUrl = $_ENV['WEBSOCKET_SERVER_URL'] ?? 'http://127.0.0.1:8085/broadcast';
+            $ch = curl_init($wsUrl);
+            $payload = json_encode([
+                'event' => 'product-updated',
+                'data' => [
+                    'productId' => $product->getId(),
+                    'name' => $product->getName(),
+                    'action' => 'stock_update',
+                    'newQuantity' => $product->getQuantity(),
+                    'message' => "Stock added to {$product->getName()}!"
+                ]
+            ]);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type:application/json']);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+            curl_exec($ch);
+            curl_close($ch);
+        } catch (\Exception $e) { }
+
         return $this->redirectToRoute('app_stock_index');
     }
 }
